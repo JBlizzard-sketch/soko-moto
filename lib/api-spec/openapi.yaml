@@ -3,20 +3,34 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Soko Moto - Dead Hours Flash Deal Platform
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: venues
+    description: Venue management
+  - name: deals
+    description: Flash deal operations
+  - name: bookings
+    description: Booking operations
+  - name: users
+    description: User profile operations
+  - name: ratings
+    description: Ratings and reviews
+  - name: standing-deals
+    description: Recurring standing deals
+  - name: feed
+    description: Discovery feed and trending
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +38,567 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ─── Venues ────────────────────────────────────────────────────────────────
+
+  /venues:
+    get:
+      operationId: listVenues
+      tags: [venues]
+      summary: List all approved venues
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum: [restaurant, spa, fitness, bar, experience]
+        - name: neighborhood
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, suspended]
+      responses:
+        "200":
+          description: List of venues
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Venue"
+    post:
+      operationId: createVenue
+      tags: [venues]
+      summary: Create a new venue (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateVenueBody"
+      responses:
+        "201":
+          description: Venue created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Venue"
+
+  /venues/{id}:
+    get:
+      operationId: getVenue
+      tags: [venues]
+      summary: Get a venue by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Venue details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Venue"
+    patch:
+      operationId: updateVenue
+      tags: [venues]
+      summary: Update venue details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateVenueBody"
+      responses:
+        "200":
+          description: Updated venue
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Venue"
+
+  /venues/{id}/stats:
+    get:
+      operationId: getVenueStats
+      tags: [venues]
+      summary: Analytics for a specific venue
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Venue analytics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VenueStats"
+
+  # ─── Deals ─────────────────────────────────────────────────────────────────
+
+  /deals:
+    get:
+      operationId: listDeals
+      tags: [deals]
+      summary: List deals
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, live, filling, sold_out, expired, completed]
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum: [restaurant, spa, fitness, bar, experience]
+        - name: venueId
+          in: query
+          schema:
+            type: integer
+        - name: neighborhood
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of deals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Deal"
+    post:
+      operationId: createDeal
+      tags: [deals]
+      summary: Create a new flash deal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDealBody"
+      responses:
+        "201":
+          description: Deal created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Deal"
+
+  /deals/{id}:
+    get:
+      operationId: getDeal
+      tags: [deals]
+      summary: Get a deal by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deal details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Deal"
+    patch:
+      operationId: updateDeal
+      tags: [deals]
+      summary: Update deal status or details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDealBody"
+      responses:
+        "200":
+          description: Updated deal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Deal"
+
+  # ─── Bookings ───────────────────────────────────────────────────────────────
+
+  /bookings:
+    get:
+      operationId: listBookings
+      tags: [bookings]
+      summary: List bookings
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: integer
+        - name: dealId
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, confirmed, completed, cancelled, no_show]
+      responses:
+        "200":
+          description: List of bookings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Booking"
+    post:
+      operationId: createBooking
+      tags: [bookings]
+      summary: Book a deal slot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBookingBody"
+      responses:
+        "201":
+          description: Booking confirmed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+
+  /bookings/{id}:
+    get:
+      operationId: getBooking
+      tags: [bookings]
+      summary: Get a booking by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Booking details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+    patch:
+      operationId: updateBooking
+      tags: [bookings]
+      summary: Update booking status (confirm, cancel, complete)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBookingBody"
+      responses:
+        "200":
+          description: Updated booking
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+
+  # ─── Users ──────────────────────────────────────────────────────────────────
+
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List users (admin)
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserBody"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/{id}:
+    get:
+      operationId: getUser
+      tags: [users]
+      summary: Get user profile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    patch:
+      operationId: updateUser
+      tags: [users]
+      summary: Update user profile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserBody"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  # ─── Ratings ────────────────────────────────────────────────────────────────
+
+  /ratings:
+    get:
+      operationId: listRatings
+      tags: [ratings]
+      summary: List ratings
+      parameters:
+        - name: venueId
+          in: query
+          schema:
+            type: integer
+        - name: userId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of ratings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Rating"
+    post:
+      operationId: createRating
+      tags: [ratings]
+      summary: Submit a rating for a completed booking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRatingBody"
+      responses:
+        "201":
+          description: Rating submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rating"
+
+  # ─── Standing Deals ─────────────────────────────────────────────────────────
+
+  /standing-deals:
+    get:
+      operationId: listStandingDeals
+      tags: [standing-deals]
+      summary: List standing deals
+      parameters:
+        - name: venueId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of standing deals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StandingDeal"
+    post:
+      operationId: createStandingDeal
+      tags: [standing-deals]
+      summary: Create a recurring standing deal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStandingDealBody"
+      responses:
+        "201":
+          description: Standing deal created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandingDeal"
+
+  /standing-deals/{id}:
+    patch:
+      operationId: updateStandingDeal
+      tags: [standing-deals]
+      summary: Update or pause a standing deal
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStandingDealBody"
+      responses:
+        "200":
+          description: Updated standing deal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandingDeal"
+    delete:
+      operationId: deleteStandingDeal
+      tags: [standing-deals]
+      summary: Delete a standing deal
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ─── Feed (wow endpoints) ────────────────────────────────────────────────────
+
+  /feed/live:
+    get:
+      operationId: getLiveFeed
+      tags: [feed]
+      summary: Get all currently live deals for the discovery feed
+      parameters:
+        - name: neighborhood
+          in: query
+          schema:
+            type: string
+        - name: category
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Live deals feed
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DealWithVenue"
+
+  /feed/trending:
+    get:
+      operationId: getTrendingDeals
+      tags: [feed]
+      summary: Deals filling fastest right now
+      responses:
+        "200":
+          description: Trending deals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DealWithVenue"
+
+  /feed/summary:
+    get:
+      operationId: getFeedSummary
+      tags: [feed]
+      summary: Platform-wide stats (for admin/venue dashboards)
+      responses:
+        "200":
+          description: Platform summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedSummary"
+
+  /feed/activity:
+    get:
+      operationId: getRecentActivity
+      tags: [feed]
+      summary: Recent platform-wide booking activity feed
+      responses:
+        "200":
+          description: Recent activity
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityItem"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +606,692 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    # ─── Venue ──────────────────────────────────────────────────────────────
+
+    Venue:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        category:
+          type: string
+          enum: [restaurant, spa, fitness, bar, experience]
+        neighborhood:
+          type: string
+        address:
+          type: string
+          nullable: true
+        imageUrl:
+          type: string
+          nullable: true
+        logoUrl:
+          type: string
+          nullable: true
+        priceRange:
+          type: string
+          enum: [budget, mid, upscale, luxury]
+        cuisineOrType:
+          type: string
+          nullable: true
+        averageRating:
+          type: number
+          nullable: true
+        totalRatings:
+          type: integer
+          nullable: true
+        status:
+          type: string
+          enum: [pending, approved, suspended]
+        contactPhone:
+          type: string
+          nullable: true
+        contactEmail:
+          type: string
+          nullable: true
+        whatsappNumber:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - category
+        - neighborhood
+        - status
+        - priceRange
+        - createdAt
+
+    CreateVenueBody:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+          enum: [restaurant, spa, fitness, bar, experience]
+        neighborhood:
+          type: string
+        address:
+          type: string
+        imageUrl:
+          type: string
+        logoUrl:
+          type: string
+        priceRange:
+          type: string
+          enum: [budget, mid, upscale, luxury]
+        cuisineOrType:
+          type: string
+        contactPhone:
+          type: string
+        contactEmail:
+          type: string
+        whatsappNumber:
+          type: string
+      required:
+        - name
+        - category
+        - neighborhood
+        - priceRange
+
+    UpdateVenueBody:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        imageUrl:
+          type: string
+        logoUrl:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, suspended]
+        cuisineOrType:
+          type: string
+        contactPhone:
+          type: string
+
+    VenueStats:
+      type: object
+      properties:
+        venueId:
+          type: integer
+        totalDeals:
+          type: integer
+        totalBookings:
+          type: integer
+        totalRevenue:
+          type: number
+        averageFillRate:
+          type: number
+        averageRating:
+          type: number
+        topDealType:
+          type: string
+        revenueRecovered:
+          type: number
+        bookingsByDayOfWeek:
+          type: array
+          items:
+            type: object
+            properties:
+              day:
+                type: string
+              count:
+                type: integer
+            required: [day, count]
+        bookingsByHour:
+          type: array
+          items:
+            type: object
+            properties:
+              hour:
+                type: integer
+              count:
+                type: integer
+            required: [hour, count]
+      required:
+        - venueId
+        - totalDeals
+        - totalBookings
+        - totalRevenue
+        - averageFillRate
+        - revenueRecovered
+
+    # ─── Deal ────────────────────────────────────────────────────────────────
+
+    Deal:
+      type: object
+      properties:
+        id:
+          type: integer
+        venueId:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        discountPercent:
+          type: integer
+        originalPrice:
+          type: number
+          nullable: true
+        dealPrice:
+          type: number
+        totalSlots:
+          type: integer
+        bookedSlots:
+          type: integer
+        availableSlots:
+          type: integer
+        status:
+          type: string
+          enum: [draft, live, filling, sold_out, expired, completed]
+        category:
+          type: string
+          enum: [restaurant, spa, fitness, bar, experience]
+        dealType:
+          type: string
+          enum: [lunch, dinner, spa, wellness, fitness, drinks, experience]
+        validFrom:
+          type: string
+          format: date-time
+        validUntil:
+          type: string
+          format: date-time
+        isStandingDeal:
+          type: boolean
+        standingDealId:
+          type: integer
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - venueId
+        - title
+        - discountPercent
+        - dealPrice
+        - totalSlots
+        - bookedSlots
+        - availableSlots
+        - status
+        - category
+        - dealType
+        - validFrom
+        - validUntil
+        - createdAt
+
+    DealWithVenue:
+      allOf:
+        - $ref: "#/components/schemas/Deal"
+        - type: object
+          properties:
+            venue:
+              $ref: "#/components/schemas/Venue"
+          required: [venue]
+
+    CreateDealBody:
+      type: object
+      properties:
+        venueId:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        discountPercent:
+          type: integer
+        originalPrice:
+          type: number
+        dealPrice:
+          type: number
+        totalSlots:
+          type: integer
+        category:
+          type: string
+          enum: [restaurant, spa, fitness, bar, experience]
+        dealType:
+          type: string
+          enum: [lunch, dinner, spa, wellness, fitness, drinks, experience]
+        validFrom:
+          type: string
+          format: date-time
+        validUntil:
+          type: string
+          format: date-time
+      required:
+        - venueId
+        - title
+        - discountPercent
+        - dealPrice
+        - totalSlots
+        - category
+        - dealType
+        - validFrom
+        - validUntil
+
+    UpdateDealBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [draft, live, filling, sold_out, expired, completed]
+        title:
+          type: string
+        description:
+          type: string
+        totalSlots:
+          type: integer
+
+    # ─── Booking ─────────────────────────────────────────────────────────────
+
+    Booking:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        dealId:
+          type: integer
+        covers:
+          type: integer
+        totalPaid:
+          type: number
+        status:
+          type: string
+          enum: [pending, confirmed, completed, cancelled, no_show]
+        bookingReference:
+          type: string
+        paymentMethod:
+          type: string
+          enum: [mpesa, card, corporate]
+        paymentReference:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        deal:
+          $ref: "#/components/schemas/Deal"
+      required:
+        - id
+        - userId
+        - dealId
+        - covers
+        - totalPaid
+        - status
+        - bookingReference
+        - paymentMethod
+        - createdAt
+
+    CreateBookingBody:
+      type: object
+      properties:
+        userId:
+          type: integer
+        dealId:
+          type: integer
+        covers:
+          type: integer
+        paymentMethod:
+          type: string
+          enum: [mpesa, card, corporate]
+        paymentReference:
+          type: string
+        notes:
+          type: string
+      required:
+        - userId
+        - dealId
+        - covers
+        - paymentMethod
+
+    UpdateBookingBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [pending, confirmed, completed, cancelled, no_show]
+        paymentReference:
+          type: string
+
+    # ─── User ────────────────────────────────────────────────────────────────
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+          nullable: true
+        neighborhood:
+          type: string
+          nullable: true
+        loyaltyTier:
+          type: string
+          enum: [bronze, silver, gold]
+        loyaltyPoints:
+          type: integer
+        totalBookings:
+          type: integer
+        totalSpend:
+          type: number
+        preferredCategories:
+          type: array
+          items:
+            type: string
+        isCorporate:
+          type: boolean
+        corporateCompany:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - phone
+        - loyaltyTier
+        - loyaltyPoints
+        - totalBookings
+        - totalSpend
+        - isCorporate
+        - createdAt
+
+    CreateUserBody:
+      type: object
+      properties:
+        name:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        neighborhood:
+          type: string
+        preferredCategories:
+          type: array
+          items:
+            type: string
+        isCorporate:
+          type: boolean
+        corporateCompany:
+          type: string
+      required:
+        - name
+        - phone
+
+    UpdateUserBody:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        neighborhood:
+          type: string
+        preferredCategories:
+          type: array
+          items:
+            type: string
+        corporateCompany:
+          type: string
+
+    # ─── Rating ──────────────────────────────────────────────────────────────
+
+    Rating:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        venueId:
+          type: integer
+        bookingId:
+          type: integer
+        score:
+          type: integer
+          minimum: 1
+          maximum: 5
+        review:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - venueId
+        - bookingId
+        - score
+        - createdAt
+
+    CreateRatingBody:
+      type: object
+      properties:
+        userId:
+          type: integer
+        venueId:
+          type: integer
+        bookingId:
+          type: integer
+        score:
+          type: integer
+          minimum: 1
+          maximum: 5
+        review:
+          type: string
+      required:
+        - userId
+        - venueId
+        - bookingId
+        - score
+
+    # ─── Standing Deal ───────────────────────────────────────────────────────
+
+    StandingDeal:
+      type: object
+      properties:
+        id:
+          type: integer
+        venueId:
+          type: integer
+        title:
+          type: string
+        discountPercent:
+          type: integer
+        dealPrice:
+          type: number
+        totalSlots:
+          type: integer
+        category:
+          type: string
+          enum: [restaurant, spa, fitness, bar, experience]
+        dealType:
+          type: string
+          enum: [lunch, dinner, spa, wellness, fitness, drinks, experience]
+        daysOfWeek:
+          type: array
+          items:
+            type: integer
+          description: "0=Sun, 1=Mon ... 6=Sat"
+        startHour:
+          type: integer
+        endHour:
+          type: integer
+        activationThreshold:
+          type: integer
+          description: "Activate if bookings below this count by trigger hour"
+        triggerHour:
+          type: integer
+          description: "Hour of day to check threshold and auto-activate"
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - venueId
+        - title
+        - discountPercent
+        - dealPrice
+        - totalSlots
+        - category
+        - dealType
+        - daysOfWeek
+        - startHour
+        - endHour
+        - activationThreshold
+        - triggerHour
+        - isActive
+        - createdAt
+
+    CreateStandingDealBody:
+      type: object
+      properties:
+        venueId:
+          type: integer
+        title:
+          type: string
+        discountPercent:
+          type: integer
+        dealPrice:
+          type: number
+        totalSlots:
+          type: integer
+        category:
+          type: string
+          enum: [restaurant, spa, fitness, bar, experience]
+        dealType:
+          type: string
+          enum: [lunch, dinner, spa, wellness, fitness, drinks, experience]
+        daysOfWeek:
+          type: array
+          items:
+            type: integer
+        startHour:
+          type: integer
+        endHour:
+          type: integer
+        activationThreshold:
+          type: integer
+        triggerHour:
+          type: integer
+      required:
+        - venueId
+        - title
+        - discountPercent
+        - dealPrice
+        - totalSlots
+        - category
+        - dealType
+        - daysOfWeek
+        - startHour
+        - endHour
+        - activationThreshold
+        - triggerHour
+
+    UpdateStandingDealBody:
+      type: object
+      properties:
+        isActive:
+          type: boolean
+        discountPercent:
+          type: integer
+        totalSlots:
+          type: integer
+        activationThreshold:
+          type: integer
+
+    # ─── Feed / Wow ──────────────────────────────────────────────────────────
+
+    FeedSummary:
+      type: object
+      properties:
+        liveDealsCount:
+          type: integer
+        totalVenues:
+          type: integer
+        bookingsToday:
+          type: integer
+        totalBookingsAllTime:
+          type: integer
+        averageFillRate:
+          type: number
+        topNeighborhood:
+          type: string
+        topCategory:
+          type: string
+        dealsByCategory:
+          type: array
+          items:
+            type: object
+            properties:
+              category:
+                type: string
+              count:
+                type: integer
+            required: [category, count]
+      required:
+        - liveDealsCount
+        - totalVenues
+        - bookingsToday
+        - totalBookingsAllTime
+        - averageFillRate
+
+    ActivityItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [booking_confirmed, deal_live, deal_sold_out, rating_posted]
+        message:
+          type: string
+        venueName:
+          type: string
+        dealTitle:
+          type: string
+          nullable: true
+        neighborhood:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+      required:
+        - id
+        - type
+        - message
+        - venueName
+        - neighborhood
+        - timestamp
