@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
-import { db, bookingsTable, dealsTable, usersTable } from "@workspace/db";
+import { db, bookingsTable, dealsTable, usersTable, venuesTable } from "@workspace/db";
 import {
   ListBookingsQueryParams,
   ListBookingsResponse,
@@ -12,6 +12,7 @@ import {
   UpdateBookingResponse,
 } from "@workspace/api-zod";
 import { randomBytes } from "crypto";
+import { sendBookingConfirmation } from "../services/whatsapp";
 
 const router: IRouter = Router();
 
@@ -98,6 +99,26 @@ router.post("/bookings", async (req, res): Promise<void> => {
     ...booking,
     deal: dealFull ? { ...dealFull, availableSlots: dealFull.totalSlots - dealFull.bookedSlots, isStandingDeal: dealFull.isStandingDeal === 1 } : null,
   }));
+
+  // Fire-and-forget: send WhatsApp confirmation
+  try {
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.id, booking.userId));
+    const [venue] = dealFull?.venueId
+      ? await db.select().from(venuesTable).where(eq(venuesTable.id, dealFull.venueId))
+      : [null];
+    if (user && dealFull && venue) {
+      sendBookingConfirmation({
+        phone: user.phone,
+        guestName: user.name,
+        venueName: venue.name,
+        dealTitle: dealFull.title,
+        bookingReference: booking.bookingReference,
+        covers: booking.covers,
+        totalPaid: booking.totalPaid,
+        validFrom: dealFull.validFrom,
+      }).catch(() => {});
+    }
+  } catch {}
 });
 
 router.get("/bookings/:id", async (req, res): Promise<void> => {

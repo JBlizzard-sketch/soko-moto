@@ -6,57 +6,73 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent } from "@/components/ui/card";
-import { Clock, MapPin, Users, CheckCircle2, ChevronLeft, Building2 } from "lucide-react";
+import { Clock, MapPin, Users, CheckCircle2, ChevronLeft, Building2, LogIn } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { Link } from "wouter";
+import { useAuth } from "@/contexts/AuthContext";
+import MpesaPayModal from "@/components/MpesaPayModal";
 
 export default function DealDetail() {
   const [, params] = useRoute("/deals/:id");
   const dealId = params?.id ? parseInt(params.id) : 0;
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  
+  const { user, openLogin } = useAuth();
+
   const [covers, setCovers] = useState(1);
-  
+  const [pendingBookingId, setPendingBookingId] = useState<number | null>(null);
+  const [pendingRef, setPendingRef] = useState("");
+  const [pendingAmount, setPendingAmount] = useState(0);
+  const [mpesaOpen, setMpesaOpen] = useState(false);
+
   const { data: deal, isLoading } = useGetDeal(dealId, {
-    query: {
-      enabled: !!dealId
-    }
+    query: { enabled: !!dealId },
   });
 
   const createBooking = useCreateBooking();
 
   const handleBook = () => {
     if (!deal) return;
-    
-    // In a real app, we'd have a logged in user. Mocking user ID 1 for now.
+    if (!user) {
+      openLogin();
+      return;
+    }
+
     createBooking.mutate(
       {
         data: {
-          userId: 1,
+          userId: user.id,
           dealId: deal.id,
           covers,
-          paymentMethod: "mpesa"
-        }
+          paymentMethod: "mpesa",
+        },
       },
       {
         onSuccess: (booking) => {
-          toast({
-            title: "Booking Confirmed!",
-            description: "Your spot has been secured. Show your confirmation at the venue.",
-          });
-          setLocation("/bookings");
+          setPendingBookingId(booking.id);
+          setPendingRef(booking.bookingReference);
+          setPendingAmount(booking.totalPaid);
+          setMpesaOpen(true);
         },
         onError: () => {
           toast({
             title: "Booking Failed",
             description: "Could not secure your booking. The deal might be sold out.",
-            variant: "destructive"
+            variant: "destructive",
           });
-        }
+        },
       }
     );
+  };
+
+  const handlePaySuccess = () => {
+    setMpesaOpen(false);
+    toast({
+      title: "Booking Confirmed!",
+      description: "Payment received. Your spot is secured — see you there!",
+    });
+    setLocation("/bookings");
   };
 
   if (isLoading) {
@@ -77,20 +93,14 @@ export default function DealDetail() {
       <div className="text-center py-20">
         <h2 className="text-2xl font-serif font-bold mb-2">Deal Not Found</h2>
         <p className="text-muted-foreground mb-6">This deal may have expired or been removed.</p>
-        <Link href="/">
-          <Button>Back to Discovery</Button>
-        </Link>
+        <Link href="/"><Button>Back to Discovery</Button></Link>
       </div>
     );
   }
 
-  // Note: the backend API schema lists 'venueId' but the response for useGetDeal includes 'venue' via join in typical Drizzle setups if implemented,
-  // but looking at the type `Deal`, it doesn't explicitly have `venue`. We'll assume the API returns it or we use placeholder for now.
-  // We'll cast to any to access venue for this mockup based on the `DealWithVenue` type existing.
   const dealWithVenue = deal as any;
   const venue = dealWithVenue.venue;
-
-  const isAvailable = deal.availableSlots > 0 && deal.status === "live";
+  const isAvailable = deal.availableSlots > 0 && (deal.status === "live" || deal.status === "filling");
 
   return (
     <div className="max-w-4xl mx-auto pb-20">
@@ -115,6 +125,11 @@ export default function DealDetail() {
                 {deal.discountPercent}% OFF
               </Badge>
             </div>
+            {deal.status === "filling" && (
+              <div className="absolute top-4 right-4">
+                <Badge className="bg-amber-500 text-white font-semibold">Filling Fast</Badge>
+              </div>
+            )}
           </div>
 
           {/* Title & Info */}
@@ -127,11 +142,7 @@ export default function DealDetail() {
                 {deal.dealType}
               </Badge>
             </div>
-            
-            <h1 className="text-3xl md:text-4xl font-serif font-bold text-foreground mb-2">
-              {deal.title}
-            </h1>
-            
+            <h1 className="text-3xl md:text-4xl font-serif font-bold text-foreground mb-2">{deal.title}</h1>
             {venue && (
               <Link href={`/venues/${venue.id}`} className="inline-flex items-center text-lg text-secondary font-medium hover:underline group">
                 {venue.name}
@@ -143,23 +154,17 @@ export default function DealDetail() {
 
           <Separator />
 
-          {/* Description */}
           {deal.description && (
             <div>
               <h3 className="text-xl font-serif font-bold mb-3">About this Deal</h3>
-              <p className="text-muted-foreground leading-relaxed whitespace-pre-line">
-                {deal.description}
-              </p>
+              <p className="text-muted-foreground leading-relaxed whitespace-pre-line">{deal.description}</p>
             </div>
           )}
 
-          {/* Venue Info if we have it */}
           {venue?.description && (
             <div className="bg-card border border-border rounded-xl p-6">
               <h3 className="text-lg font-serif font-bold mb-2">About {venue.name}</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                {venue.description}
-              </p>
+              <p className="text-sm text-muted-foreground mb-4">{venue.description}</p>
               {venue.address && (
                 <div className="flex items-start text-sm">
                   <MapPin className="w-4 h-4 mr-2 text-primary shrink-0 mt-0.5" />
@@ -176,12 +181,12 @@ export default function DealDetail() {
             <Card className="border-secondary/20 shadow-xl overflow-hidden">
               <div className="bg-secondary p-6 text-secondary-foreground text-center">
                 <div className="text-sm font-medium mb-1 opacity-90">Deal Price</div>
-                <div className="text-4xl font-bold font-serif mb-1">KES {deal.dealPrice}</div>
+                <div className="text-4xl font-bold font-serif mb-1">KES {deal.dealPrice.toLocaleString()}</div>
                 {deal.originalPrice && (
-                  <div className="text-sm opacity-70 line-through">Regularly KES {deal.originalPrice}</div>
+                  <div className="text-sm opacity-70 line-through">Regularly KES {deal.originalPrice.toLocaleString()}</div>
                 )}
               </div>
-              
+
               <CardContent className="p-6 space-y-6">
                 <div className="flex items-center justify-between p-3 bg-secondary/5 rounded-lg border border-secondary/10">
                   <div className="flex items-center text-sm font-medium">
@@ -189,56 +194,65 @@ export default function DealDetail() {
                     Valid Today
                   </div>
                   <div className="text-sm font-bold">
-                    {format(parseISO(deal.validFrom), "h:mm a")} - {format(parseISO(deal.validUntil), "h:mm a")}
+                    {format(parseISO(deal.validFrom), "h:mm a")} – {format(parseISO(deal.validUntil), "h:mm a")}
                   </div>
                 </div>
 
                 <div className="space-y-3">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Available Slots</span>
-                    <span className={`font-bold ${deal.availableSlots <= 2 ? 'text-destructive' : 'text-foreground'}`}>
+                    <span className={`font-bold ${deal.availableSlots <= 2 ? "text-destructive" : "text-foreground"}`}>
                       {deal.availableSlots} of {deal.totalSlots}
                     </span>
                   </div>
-                  
+
                   {isAvailable ? (
                     <div className="space-y-4">
                       <div>
                         <label className="text-sm font-medium mb-2 block">Number of People</label>
                         <div className="flex items-center border rounded-lg overflow-hidden">
-                          <button 
+                          <button
                             className="px-4 py-2 bg-muted hover:bg-secondary/10 transition-colors disabled:opacity-50"
                             onClick={() => setCovers(Math.max(1, covers - 1))}
                             disabled={covers <= 1}
-                          >
-                            -
-                          </button>
+                          >-</button>
                           <div className="flex-1 text-center font-medium">{covers}</div>
-                          <button 
+                          <button
                             className="px-4 py-2 bg-muted hover:bg-secondary/10 transition-colors disabled:opacity-50"
                             onClick={() => setCovers(Math.min(deal.availableSlots, covers + 1))}
                             disabled={covers >= deal.availableSlots}
-                          >
-                            +
-                          </button>
+                          >+</button>
                         </div>
                       </div>
-                      
+
                       <div className="pt-2">
                         <div className="flex justify-between text-sm mb-4">
                           <span>Total to pay</span>
-                          <span className="font-bold text-lg">KES {deal.dealPrice * covers}</span>
+                          <span className="font-bold text-lg">KES {(deal.dealPrice * covers).toLocaleString()}</span>
                         </div>
-                        <Button 
-                          className="w-full text-lg h-12 font-bold" 
-                          size="lg"
-                          onClick={handleBook}
-                          disabled={createBooking.isPending}
-                        >
-                          {createBooking.isPending ? "Confirming..." : "Book Now"}
-                        </Button>
+
+                        {user ? (
+                          <Button
+                            className="w-full text-lg h-12 font-bold"
+                            size="lg"
+                            onClick={handleBook}
+                            disabled={createBooking.isPending}
+                          >
+                            {createBooking.isPending ? "Creating Booking…" : "Book & Pay via M-Pesa"}
+                          </Button>
+                        ) : (
+                          <Button
+                            className="w-full text-lg h-12 font-bold"
+                            size="lg"
+                            onClick={openLogin}
+                            variant="outline"
+                          >
+                            <LogIn className="mr-2 h-5 w-5" />
+                            Sign In to Book
+                          </Button>
+                        )}
                         <p className="text-center text-xs text-muted-foreground mt-3">
-                          You will be charged via M-PESA
+                          Secured via M-Pesa STK Push
                         </p>
                       </div>
                     </div>
@@ -271,6 +285,18 @@ export default function DealDetail() {
           </div>
         </div>
       </div>
+
+      {pendingBookingId && (
+        <MpesaPayModal
+          open={mpesaOpen}
+          onClose={() => setMpesaOpen(false)}
+          onSuccess={handlePaySuccess}
+          bookingId={pendingBookingId}
+          bookingReference={pendingRef}
+          amount={pendingAmount}
+          defaultPhone={user?.phone ?? ""}
+        />
+      )}
     </div>
   );
 }

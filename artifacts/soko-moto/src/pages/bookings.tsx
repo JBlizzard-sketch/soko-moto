@@ -3,15 +3,19 @@ import { format, parseISO } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Ticket, MapPin, CalendarDays, Clock, QrCode } from "lucide-react";
-import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { Ticket, MapPin, CalendarDays, Clock, QrCode, LogIn } from "lucide-react";
+import { Link } from "wouter";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Bookings() {
-  // Assuming logged in user is ID 1 for mockup
-  const { data: bookings, isLoading } = useListBookings({ userId: 1 });
+  const { user, loading: authLoading, openLogin } = useAuth();
+  const { data: bookings, isLoading } = useListBookings(
+    { userId: user?.id ?? 0 },
+    { query: { enabled: !!user } }
+  );
 
-  if (isLoading) {
+  if (authLoading || (isLoading && !!user)) {
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-serif font-bold">My Bookings</h1>
@@ -24,11 +28,26 @@ export default function Bookings() {
     );
   }
 
+  if (!user) {
+    return (
+      <div className="text-center py-20 bg-card rounded-xl border border-border max-w-md mx-auto">
+        <div className="w-16 h-16 bg-secondary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+          <LogIn className="w-8 h-8 text-secondary/50" />
+        </div>
+        <h3 className="text-xl font-serif font-bold mb-2">Sign in to see your bookings</h3>
+        <p className="text-muted-foreground max-w-sm mx-auto mb-6">
+          You need to be signed in to view your flash deal bookings.
+        </p>
+        <Button onClick={openLogin}>Sign In</Button>
+      </div>
+    );
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'confirmed': return 'bg-secondary text-secondary-foreground';
       case 'completed': return 'bg-muted text-muted-foreground';
-      case 'cancelled': 
+      case 'cancelled':
       case 'no_show': return 'bg-destructive text-destructive-foreground';
       default: return 'bg-primary text-primary-foreground';
     }
@@ -47,7 +66,7 @@ export default function Bookings() {
           </div>
           <h3 className="text-xl font-serif font-bold mb-2">No bookings yet</h3>
           <p className="text-muted-foreground max-w-md mx-auto mb-6">
-            You haven't snagged any dead hour deals yet. Discover what's available right now.
+            You haven't snagged any flash deals yet. Discover what's available right now.
           </p>
           <Link href="/">
             <Button>Explore Deals</Button>
@@ -56,22 +75,19 @@ export default function Bookings() {
       ) : (
         <div className="space-y-6">
           {bookings.map((booking) => {
-            // Using cast for relation data that Drizzle would provide
             const deal = booking.deal as any;
             const venue = deal?.venue;
 
             return (
               <Card key={booking.id} className="overflow-hidden border-border bg-card shadow-sm hover-elevate transition-all">
                 <div className="flex flex-col sm:flex-row">
-                  {/* Left side - visual/qr placeholder */}
                   <div className="sm:w-48 bg-secondary/5 flex flex-col items-center justify-center p-6 border-b sm:border-b-0 sm:border-r border-border">
                     <QrCode className="w-16 h-16 text-secondary/40 mb-3" />
                     <div className="text-xs font-mono tracking-widest text-muted-foreground bg-background px-2 py-1 rounded border">
                       {booking.bookingReference}
                     </div>
                   </div>
-                  
-                  {/* Right side - details */}
+
                   <div className="flex-1 flex flex-col">
                     <CardHeader className="p-4 pb-2 flex flex-row items-start justify-between space-y-0">
                       <div>
@@ -90,7 +106,7 @@ export default function Bookings() {
                         <div className="text-sm text-muted-foreground">{booking.covers} {booking.covers === 1 ? 'person' : 'people'}</div>
                       </div>
                     </CardHeader>
-                    
+
                     <CardContent className="p-4 pt-2 mt-auto">
                       <div className="flex flex-wrap gap-4 text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
                         <div className="flex items-center">
@@ -99,7 +115,7 @@ export default function Bookings() {
                         </div>
                         <div className="flex items-center">
                           <Clock className="w-4 h-4 mr-2 text-primary" />
-                          {deal?.validFrom ? format(parseISO(deal.validFrom), "h:mm a") : ""} - 
+                          {deal?.validFrom ? format(parseISO(deal.validFrom), "h:mm a") : ""} -{" "}
                           {deal?.validUntil ? format(parseISO(deal.validUntil), "h:mm a") : ""}
                         </div>
                         <div className="flex items-center">
@@ -107,14 +123,6 @@ export default function Bookings() {
                           {venue?.neighborhood || "Location"}
                         </div>
                       </div>
-                      
-                      {booking.status === 'confirmed' && (
-                        <div className="mt-4 pt-4 border-t border-border flex justify-end">
-                          <Button variant="outline" size="sm" className="text-destructive border-destructive/20 hover:bg-destructive hover:text-destructive-foreground">
-                            Cancel Booking
-                          </Button>
-                        </div>
-                      )}
                     </CardContent>
                   </div>
                 </div>

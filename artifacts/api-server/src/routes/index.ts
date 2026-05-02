@@ -7,10 +7,14 @@ import usersRouter from "./users";
 import ratingsRouter from "./ratings";
 import standingDealsRouter from "./standingDeals";
 import feedRouter from "./feed";
+import authRouter from "./auth";
+import paymentsRouter from "./payments";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use("/auth", authRouter);
+router.use("/payments", paymentsRouter);
 router.use(venuesRouter);
 router.use(dealsRouter);
 router.use(bookingsRouter);
